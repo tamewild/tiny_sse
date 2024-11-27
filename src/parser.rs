@@ -66,36 +66,43 @@ fn parse_field(bytes: &[u8]) -> Option<Field> {
 }
 
 pub enum ParsedLine<'a> {
-    Field {
-        field: Field<'a>,
-        rem: &'a [u8]
-    },
+    Field(Field<'a>),
     Dispatch,
-    Ignored {
+    Ignored
+}
+
+pub enum ParseResult<'a> {
+    Parsed {
+        line: ParsedLine<'a>,
         rem: &'a [u8]
     },
     Incomplete
 }
 
-pub fn parse_line(buffer: &[u8]) -> ParsedLine {
+pub fn parse_line(buffer: &[u8]) -> ParseResult {
     let Some((line, rem)) = split_at_eol(buffer) else {
-        return ParsedLine::Incomplete
+        return ParseResult::Incomplete
     };
 
     if line.is_empty() {
-        return ParsedLine::Dispatch
+        return ParseResult::Parsed {
+            line: ParsedLine::Dispatch,
+            rem
+        }
     } else if matches!(line.first(), Some(b':')) {
-        return ParsedLine::Ignored {
+        return ParseResult::Parsed {
+            line: ParsedLine::Ignored,
             rem,
         }
     }
 
     match parse_field(line) {
-        None => ParsedLine::Ignored {
+        None => ParseResult::Parsed {
+            line: ParsedLine::Ignored,
             rem,
         },
-        Some(field) => ParsedLine::Field {
-            field,
+        Some(field) => ParseResult::Parsed {
+            line: ParsedLine::Field(field),
             rem,
         }
     }

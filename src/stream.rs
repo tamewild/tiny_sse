@@ -1,4 +1,4 @@
-use crate::parser::{Field, FieldKind, ParsedLine};
+use crate::parser::{Field, FieldKind, ParseResult};
 use crate::Error;
 use crate::{parser, Event};
 use futures_core::Stream;
