@@ -220,6 +220,20 @@ mod tests {
 
     #[tokio::test]
     async fn multiple_data_lines() {
+        let body = r#"data: YHOO
+data: +2
+data: 10
+
+"#;
+
+        assert_events(body, vec![Event {
+            data: "YHOO\n+2\n10".to_string(),
+            ..message_event()
+        }]).await
+    }
+
+    #[tokio::test]
+    async fn mixed_data() {
         let body = r#"data: This is the first message.
 
 data: This is the second message, it
@@ -240,6 +254,38 @@ data: This is the third message.
             },
             Event {
                 data: "This is the third message.".to_string(),
+                ..message_event()
+            }
+        ]).await
+    }
+
+    #[tokio::test]
+    async fn events() {
+        let body = r#"event: add
+data: 73857293
+
+event: remove
+data: 2153
+
+event: add
+data: 113411
+
+"#;
+
+        assert_events(body, vec![
+            Event {
+                ty: "add".to_string(),
+                data: "73857293".to_string(),
+                ..message_event()
+            },
+            Event {
+                ty: "remove".to_string(),
+                data: "2153".to_string(),
+                ..message_event()
+            },
+            Event {
+                ty: "add".to_string(),
+                data: "113411".to_string(),
                 ..message_event()
             }
         ]).await
