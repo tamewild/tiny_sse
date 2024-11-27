@@ -112,7 +112,6 @@ fn strip_bom<'a, 'b>(bytes: &'a [u8], bom_checked: &'b mut bool) -> &'a [u8] {
 }
 
 
-// todo handle bom
 pin_project! {
     pub struct EventStream<St> {
         #[pin]
