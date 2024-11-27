@@ -84,10 +84,12 @@ fn parse_lines_for_event<'a, 'b, E>(
                         builder.process_field(field)?;
                     }
                     ParsedLine::Dispatch => {
-                        break Ok((
-                            builder.dispatch(),
-                            rem
-                        ))
+                        if let Some(event) = builder.dispatch() {
+                            break Ok((
+                                Some(event),
+                                rem
+                            ))
+                        }
                     }
                     ParsedLine::Ignored => {}
                 }
@@ -122,6 +124,19 @@ pin_project! {
     }
 }
 
+impl<St> EventStream<St> {
+    pub fn new(stream: St) -> Self {
+        Self {
+            stream,
+            buffer: Vec::new(),
+            builder: EventBuilder {
+                event: Event::default(),
+            },
+            bom_checked: false,
+        }
+    }
+}
+
 impl<St, B, E> Stream for EventStream<St>
 where
     St: Stream<Item = Result<B, E>>,
@@ -133,6 +148,7 @@ where
         let mut this = self.project();
 
         // The remaining buffer could still have complete events. We should process them.
+        println!("{}", this.buffer.len());
         if let (Some(event), rem) = parse_lines_for_event(&this.buffer, &mut this.builder)? {
             this.buffer.drain(..this.buffer.len() - rem.len());
             return Poll::Ready(Some(Ok(event)))
@@ -145,6 +161,7 @@ where
 
         Poll::Ready(loop {
             let Some(bytes) = ready!(this.stream.as_mut().poll_next(cx)) else {
+                println!("ended");
                 // Stream ended
                 break None
             };
@@ -157,6 +174,7 @@ where
                 let (event, rem) = parse_lines_for_event(bytes, &mut this.builder)?;
 
                 this.buffer.extend_from_slice(rem);
+                println!("fired {:?}", std::str::from_utf8(rem));
 
                 event
             } else {
@@ -176,5 +194,34 @@ where
                 Some(event) => break Some(Ok(event))
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::convert::Infallible;
+    use futures::{stream, TryStreamExt};
+    use crate::stream::EventStream;
+
+    #[tokio::test]
+    async fn four_blocks() {
+        let body = r#": test stream
+
+data: first event
+id: 1
+
+data:second event
+id
+
+data:  third event"#;
+
+        let stream = EventStream::new(stream::once(async move {
+            Ok::<_, Infallible>(body)
+        }));
+
+        let res = stream.try_for_each(|event| async move {
+            println!("{event:#?}");
+            Ok(())
+        }).await;
     }
 }
