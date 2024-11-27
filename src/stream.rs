@@ -103,7 +103,7 @@ fn parse_lines_for_event<'a, 'b, E>(
 }
 
 fn strip_bom<'a, 'b>(bytes: &'a [u8], bom_checked: &'b mut bool) -> &'a [u8] {
-    const UTF_8_BOM: &[u8] = b"\xEE\xBB\xBF";
+    const UTF_8_BOM: &[u8] = b"\xEF\xBB\xBF";
 
     if !*bom_checked && bytes.len() >= UTF_8_BOM.len() {
         *bom_checked = true;
@@ -177,9 +177,9 @@ where
             } else {
                 this.buffer.extend_from_slice(bytes.as_ref());
 
-                let bytes = strip_bom(bytes.as_ref(), &mut this.bom_checked);
+                let buffer = strip_bom(this.buffer, &mut this.bom_checked);
 
-                let (event, rem) = parse_lines_for_event(bytes, &mut this.builder)?;
+                let (event, rem) = parse_lines_for_event(buffer, &mut this.builder)?;
 
                 this.buffer.drain(..this.buffer.len() - rem.len());
 
@@ -402,5 +402,31 @@ data:  third event"#;
         }
 
         assert_eq!(stream.buffer.capacity(), 0);
+    }
+
+    #[tokio::test]
+    async fn bom() {
+        assert_events("\u{FEFF}data:Test\n\n", vec![Event {
+            data: "Test".to_string(),
+            ..message_event()
+        }]).await;
+    }
+
+    #[tokio::test]
+    async fn noncontiguous_bom() {
+        let chunks: [&'static [u8]; 3] = [
+            b"\xEF",
+            b"\xBB",
+            b"\xBFdata:Test\n\n"
+        ];
+
+        let stream = EventStream::new(stream::iter(chunks.map(Ok::<_, Infallible>)));
+
+        let events = stream.try_collect::<Vec<_>>().await.unwrap();
+
+        assert_eq!(vec![Event {
+            data: "Test".to_string(),
+            ..message_event()
+        }], events);
     }
 }
