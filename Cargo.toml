@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 memchr = "2.7.4"
+futures-core = "0.3.31"
+pin-project-lite = "0.2.15"

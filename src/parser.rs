@@ -21,7 +21,7 @@ fn split_at_eol(bytes: &[u8]) -> Option<(&[u8], &[u8])> {
     ))
 }
 
-enum FieldKind {
+pub enum FieldKind {
     Event,
     Data,
     Id,
@@ -44,9 +44,9 @@ fn parse_field_kind(bytes: &[u8]) -> Option<(FieldKind, &[u8])> {
     )
 }
 
-struct Field<'a> {
-    kind: FieldKind,
-    value: &'a [u8]
+pub struct Field<'a> {
+    pub kind: FieldKind,
+    pub value: &'a [u8]
 }
 
 fn parse_field_value(bytes: &[u8]) -> Option<&[u8]> {
@@ -65,7 +65,7 @@ fn parse_field(bytes: &[u8]) -> Option<Field> {
     })
 }
 
-enum ParsedLine<'a> {
+pub enum ParsedLine<'a> {
     Field {
         field: Field<'a>,
         rem: &'a [u8]
