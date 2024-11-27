@@ -148,7 +148,6 @@ where
         let mut this = self.project();
 
         // The remaining buffer could still have complete events. We should process them.
-        println!("{}", this.buffer.len());
         if let (Some(event), rem) = parse_lines_for_event(&this.buffer, &mut this.builder)? {
             this.buffer.drain(..this.buffer.len() - rem.len());
             return Poll::Ready(Some(Ok(event)))
@@ -161,7 +160,6 @@ where
 
         Poll::Ready(loop {
             let Some(bytes) = ready!(this.stream.as_mut().poll_next(cx)) else {
-                println!("ended");
                 // Stream ended
                 break None
             };
@@ -174,7 +172,6 @@ where
                 let (event, rem) = parse_lines_for_event(bytes, &mut this.builder)?;
 
                 this.buffer.extend_from_slice(rem);
-                println!("fired {:?}", std::str::from_utf8(rem));
 
                 event
             } else {
@@ -199,9 +196,27 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::convert::Infallible;
-    use futures::{stream, TryStreamExt};
     use crate::stream::EventStream;
+    use crate::Event;
+    use futures::{stream, TryStreamExt};
+    use std::convert::Infallible;
+
+    async fn assert_events(body: &str, events: Vec<Event>) {
+        let stream = EventStream::new(stream::once(async move {
+            Ok::<_, Infallible>(body)
+        }));
+
+        let stream_events = stream.try_collect::<Vec<_>>().await.unwrap();
+
+        assert_eq!(events, stream_events);
+    }
+
+    fn message_event() -> Event {
+        Event {
+            ty: "message".to_string(),
+            ..Event::default()
+        }
+    }
 
     #[tokio::test]
     async fn four_blocks() {
@@ -213,15 +228,49 @@ id: 1
 data:second event
 id
 
+data:  third event
+
+"#;
+
+        assert_events(body, vec![
+            Event {
+                data: "first event".to_string(),
+                id: "1".to_string(),
+                ..message_event()
+            },
+            Event {
+                data: "second event".to_string(),
+                ..message_event()
+            },
+            Event {
+                data: " third event".to_string(),
+                ..message_event()
+            }
+        ]).await
+    }
+
+    #[tokio::test]
+    async fn three_blocks() {
+        let body = r#": test stream
+
+data: first event
+id: 1
+
+data:second event
+id
+
 data:  third event"#;
 
-        let stream = EventStream::new(stream::once(async move {
-            Ok::<_, Infallible>(body)
-        }));
-
-        let res = stream.try_for_each(|event| async move {
-            println!("{event:#?}");
-            Ok(())
-        }).await;
+        assert_events(body, vec![
+            Event {
+                data: "first event".to_string(),
+                id: "1".to_string(),
+                ..message_event()
+            },
+            Event {
+                data: "second event".to_string(),
+                ..message_event()
+            },
+        ]).await
     }
 }
