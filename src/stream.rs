@@ -219,6 +219,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn multiple_data_lines() {
+        let body = r#"data: This is the first message.
+
+data: This is the second message, it
+data: has two lines.
+
+data: This is the third message.
+
+"#;
+
+        assert_events(body, vec![
+            Event {
+                data: "This is the first message.".to_string(),
+                ..message_event()
+            },
+            Event {
+                data: "This is the second message, it\nhas two lines.".to_string(),
+                ..message_event()
+            },
+            Event {
+                data: "This is the third message.".to_string(),
+                ..message_event()
+            }
+        ]).await
+    }
+
+    #[tokio::test]
     async fn four_blocks() {
         let body = r#": test stream
 
