@@ -429,4 +429,26 @@ data:  third event"#;
             ..message_event()
         }], events);
     }
+
+    #[tokio::test]
+    async fn noncontiguous_regular() {
+        let stream = EventStream::new(stream::iter([
+            "d",
+            "ata:",
+            " ",
+            "Te",
+            "st",
+            "\n",
+            "event:test",
+            "\n\n"
+        ]).map(Ok::<_, Infallible>));
+
+        let events = stream.try_collect::<Vec<_>>().await.unwrap();
+
+        assert_eq!(vec![Event {
+            data: "Test".to_string(),
+            ty: "test".to_string(),
+            ..message_event()
+        }], events);
+    }
 }
