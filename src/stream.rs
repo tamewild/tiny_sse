@@ -273,4 +273,17 @@ data:  third event"#;
             },
         ]).await
     }
+
+    #[tokio::test]
+    async fn identical() {
+        assert_events("data:test\n\n", vec![Event {
+            data: "test".to_string(),
+            ..message_event()
+        }]).await;
+
+        assert_events("data: test\n\n", vec![Event {
+            data: "test".to_string(),
+            ..message_event()
+        }]).await;
+    }
 }
