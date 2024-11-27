@@ -61,14 +61,14 @@ fn parse_field(bytes: &[u8]) -> Option<Field> {
 
     Some(Field {
         kind,
-        // I think if you do this:
-        // ```
-        // data
-        // data: test
-        // ```
-        // The current result with this library would be: `test`
-        // But in the spec, it would be `\ntest` (I highly doubt anyone is relying on this behavior though)
-        value: parse_field_value(rem)?,
+        value: if !rem.is_empty() {
+            // If it is NOT empty and doesn't have a colon following it, it's a unrecognized field kind.
+            // (even if it begins with a recognized field kind)
+            parse_field_value(rem)?
+        } else {
+            // If it is empty and we've recognized the field kind (see above), it's just blank.
+            &[]
+        }
     })
 }
 

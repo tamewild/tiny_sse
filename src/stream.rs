@@ -198,10 +198,15 @@ where
 mod tests {
     use crate::stream::EventStream;
     use crate::Event;
-    use futures::{stream, TryStreamExt};
+    use futures::{stream, StreamExt, TryStreamExt};
     use std::convert::Infallible;
+    use std::fmt::Debug;
+    use std::pin::pin;
 
-    async fn assert_events(body: &str, events: Vec<Event>) {
+    async fn assert_events(
+        body: &str,
+        events: impl PartialEq<Vec<Event>> + Debug
+    ) {
         let stream = EventStream::new(stream::once(async move {
             Ok::<_, Infallible>(body)
         }));
@@ -349,14 +354,53 @@ data:  third event"#;
 
     #[tokio::test]
     async fn identical() {
-        assert_events("data:test\n\n", vec![Event {
+        let event = vec![Event {
             data: "test".to_string(),
             ..message_event()
-        }]).await;
+        }];
 
-        assert_events("data: test\n\n", vec![Event {
-            data: "test".to_string(),
+        assert_events("data:test\n\n", &*event).await;
+
+        assert_events("data: test\n\n", event).await;
+    }
+
+    #[tokio::test]
+    async fn weird() {
+        let event = vec![Event {
+            data: "\nTest".to_string(),
             ..message_event()
-        }]).await;
+        }];
+
+        assert_events("data:\ndata:Test\n\n", &*event).await;
+
+        assert_events("data\ndata:Test\n\n", event).await;
+    }
+
+    #[tokio::test]
+    async fn retry() {
+        let event = vec![Event {
+            data: "".to_string(),
+            retry: Some(5),
+            ..message_event()
+        }];
+
+        assert_events("data:\nretry:5\n\n", &*event).await;
+
+        // Without a colon
+        assert_events("data\nretry:5\n\n", event).await;
+    }
+
+    #[tokio::test]
+    async fn no_main_buffer_alloc() {
+        let mut stream = pin!(EventStream::new(stream::iter([
+            "data: Test\n",
+            "data:Second line.\n\n"
+        ]).map(Ok::<_, Infallible>)));
+
+        while let Some(Ok(event)) = stream.next().await {
+            println!("{event:#?}");
+        }
+
+        assert_eq!(stream.buffer.capacity(), 0);
     }
 }
