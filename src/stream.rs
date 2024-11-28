@@ -466,4 +466,21 @@ data:  third event"#;
             }
         ]).await;
     }
+
+    #[tokio::test]
+    async fn regular_chunks() {
+        let regular_chunks = tokio::fs::read_to_string("misc/regular_chunks.json").await.unwrap();
+
+        let chunks = serde_json::from_str::<Vec<String>>(regular_chunks.as_str()).unwrap();
+
+        let chunks_len = chunks.len();
+
+        let stream = EventStream::new(stream::iter(chunks).map(Ok::<_, Infallible>));
+
+        let events = stream.try_collect::<Vec<_>>().await.unwrap();
+
+        assert_eq!(chunks_len, events.len());
+
+        dbg!(events);
+    }
 }
