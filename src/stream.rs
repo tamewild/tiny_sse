@@ -451,4 +451,19 @@ data:  third event"#;
             ..message_event()
         }], events);
     }
+
+    #[tokio::test]
+    async fn irregular_eol() {
+        assert_events("data:test\r\ndata: test2\r\r\nevent:hello\r\ndata:hello2\r\n\r\n", vec![
+            Event {
+                data: "test\ntest2".to_string(),
+                ..message_event()
+            },
+            Event {
+                ty: "hello".to_string(),
+                data: "hello2".to_string(),
+                ..message_event()
+            }
+        ]).await;
+    }
 }
