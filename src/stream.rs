@@ -475,11 +475,18 @@ data:  third event"#;
 
         let chunks_len = chunks.len();
 
-        let stream = EventStream::new(stream::iter(chunks).map(Ok::<_, Infallible>));
+        let mut stream = pin!(
+            EventStream::new(stream::iter(chunks).map(Ok::<_, Infallible>))
+        );
 
-        let events = stream.try_collect::<Vec<_>>().await.unwrap();
+        let mut events = Vec::with_capacity(chunks_len);
+
+        while let Some(Ok(event)) = stream.next().await {
+            events.push(event);
+        }
 
         assert_eq!(chunks_len, events.len());
+        assert_eq!(stream.buffer.capacity(), 0);
 
         dbg!(events);
     }
