@@ -486,8 +486,7 @@ data:  third event"#;
         }
 
         assert_eq!(chunks_len, events.len());
+        assert!(stream.buffer.is_empty());
         assert_eq!(stream.buffer.capacity(), 0);
-
-        dbg!(events);
     }
 }
