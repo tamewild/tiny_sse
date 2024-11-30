@@ -201,6 +201,7 @@ mod tests {
     use futures::{stream, StreamExt, TryStreamExt};
     use std::convert::Infallible;
     use std::fmt::Debug;
+    use std::path::Path;
     use std::pin::pin;
 
     async fn assert_events(
@@ -467,11 +468,15 @@ data:  third event"#;
         ]).await;
     }
 
+    async fn chunks(path: impl AsRef<Path>) -> Vec<String> {
+        let raw = tokio::fs::read_to_string(path).await.unwrap();
+
+        serde_json::from_str::<Vec<String>>(raw.as_str()).unwrap()
+    }
+
     #[tokio::test]
     async fn regular_chunks() {
-        let regular_chunks = tokio::fs::read_to_string("misc/regular_chunks.json").await.unwrap();
-
-        let chunks = serde_json::from_str::<Vec<String>>(regular_chunks.as_str()).unwrap();
+        let chunks = chunks("misc/regular_chunks.json").await;
 
         let chunks_len = chunks.len();
 
@@ -488,5 +493,21 @@ data:  third event"#;
         assert_eq!(chunks_len, events.len());
         assert!(stream.buffer.is_empty());
         assert_eq!(stream.buffer.capacity(), 0);
+    }
+
+    #[tokio::test]
+    async fn irregular_chunks() {
+        let regular_chunks = chunks("misc/regular_chunks.json").await;
+        let irregular_chunks = chunks("misc/irregular_chunks.json").await;
+
+        let regular_events = EventStream::new(
+            stream::iter(regular_chunks.as_slice()).map(Ok::<_, Infallible>)
+        ).try_collect::<Vec<_>>().await.unwrap();
+        let irregular_events = EventStream::new(
+            stream::iter(irregular_chunks).map(Ok::<_, Infallible>)
+        ).try_collect::<Vec<_>>().await.unwrap();
+
+        assert_eq!(regular_chunks.len(), regular_events.len());
+        assert_eq!(irregular_events, regular_events);
     }
 }
