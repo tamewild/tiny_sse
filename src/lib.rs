@@ -4,6 +4,8 @@ use std::string::FromUtf8Error;
 mod parser;
 mod stream;
 
+pub use stream::*;
+
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Event {
     /// The event's type if provided. Otherwise, empty.
