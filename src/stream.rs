@@ -206,17 +206,21 @@ mod tests {
     use std::path::Path;
     use std::pin::pin;
 
-    async fn assert_events(
+    async fn assert_events<T>(
         body: &str,
-        events: impl PartialEq<Vec<Event>> + Debug
-    ) {
+        events: T
+    )
+        where
+            T: Debug,
+            Vec<Event>: PartialEq<T>
+    {
         let stream = EventStream::new(stream::once(async move {
             Ok::<_, Infallible>(body)
         }));
 
         let stream_events = stream.try_collect::<Vec<_>>().await.unwrap();
 
-        assert_eq!(events, stream_events);
+        assert_eq!(stream_events, events);
     }
 
     fn message_event() -> Event {
@@ -234,7 +238,7 @@ data: 10
 
 "#;
 
-        assert_events(body, vec![Event {
+        assert_events(body, [Event {
             data: "YHOO\n+2\n10".to_string(),
             ..message_event()
         }]).await
@@ -251,7 +255,7 @@ data: This is the third message.
 
 "#;
 
-        assert_events(body, vec![
+        assert_events(body, [
             Event {
                 data: "This is the first message.".to_string(),
                 ..message_event()
@@ -280,7 +284,7 @@ data: 113411
 
 "#;
 
-        assert_events(body, vec![
+        assert_events(body, [
             Event {
                 ty: "add".to_string(),
                 data: "73857293".to_string(),
@@ -313,7 +317,7 @@ data:  third event
 
 "#;
 
-        assert_events(body, vec![
+        assert_events(body, [
             Event {
                 data: "first event".to_string(),
                 id: "1".to_string(),
@@ -342,7 +346,7 @@ id
 
 data:  third event"#;
 
-        assert_events(body, vec![
+        assert_events(body, [
             Event {
                 data: "first event".to_string(),
                 id: "1".to_string(),
@@ -357,37 +361,37 @@ data:  third event"#;
 
     #[tokio::test]
     async fn identical() {
-        let event = vec![Event {
+        let event = [Event {
             data: "test".to_string(),
             ..message_event()
         }];
 
-        assert_events("data:test\n\n", &*event).await;
+        assert_events("data:test\n\n", &event).await;
 
         assert_events("data: test\n\n", event).await;
     }
 
     #[tokio::test]
     async fn weird() {
-        let event = vec![Event {
+        let event = [Event {
             data: "\nTest".to_string(),
             ..message_event()
         }];
 
-        assert_events("data:\ndata:Test\n\n", &*event).await;
+        assert_events("data:\ndata:Test\n\n", &event).await;
 
         assert_events("data\ndata:Test\n\n", event).await;
     }
 
     #[tokio::test]
     async fn retry() {
-        let event = vec![Event {
+        let event = [Event {
             data: "".to_string(),
             retry: Some(5),
             ..message_event()
         }];
 
-        assert_events("data:\nretry:5\n\n", &*event).await;
+        assert_events("data:\nretry:5\n\n", &event).await;
 
         // Without a colon
         assert_events("data\nretry:5\n\n", event).await;
@@ -409,7 +413,7 @@ data:  third event"#;
 
     #[tokio::test]
     async fn bom() {
-        assert_events("\u{FEFF}data:Test\n\n", vec![Event {
+        assert_events("\u{FEFF}data:Test\n\n", [Event {
             data: "Test".to_string(),
             ..message_event()
         }]).await;
@@ -457,7 +461,7 @@ data:  third event"#;
 
     #[tokio::test]
     async fn irregular_eol() {
-        assert_events("data:test\r\ndata: test2\r\r\nevent:hello\r\ndata:hello2\r\n\r\n", vec![
+        assert_events("data:test\r\ndata: test2\r\r\nevent:hello\r\ndata:hello2\r\n\r\n", [
             Event {
                 data: "test\ntest2".to_string(),
                 ..message_event()
