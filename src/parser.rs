@@ -30,14 +30,14 @@ pub enum FieldKind {
 
 fn parse_field_kind(bytes: &[u8]) -> Option<(FieldKind, &[u8])> {
     Some(
-        if let Some(rem) = bytes.strip_prefix(b"event") {
-            (FieldKind::Event, rem)
-        } else if let Some(rem) = bytes.strip_prefix(b"data") {
+        if let Some(rem) = bytes.strip_prefix(b"data") {
             (FieldKind::Data, rem)
-        } else if let Some(rem) = bytes.strip_prefix(b"id") {
-            (FieldKind::Id, rem)
+        } else if let Some(rem) = bytes.strip_prefix(b"event") {
+            (FieldKind::Event, rem)
         } else if let Some(rem) = bytes.strip_prefix(b"retry") {
             (FieldKind::Retry, rem)
+        } else if let Some(rem) = bytes.strip_prefix(b"id") {
+            (FieldKind::Id, rem)
         } else {
             return None
         }
