@@ -107,14 +107,9 @@ where
 mod tests {
     use std::convert::Infallible;
     use std::pin::pin;
-    use std::string::FromUtf8Error;
     use futures::{stream, StreamExt, TryStreamExt};
     use crate::EventStream;
     use crate::stream::data_only::DataOnlyStream;
-
-    fn as_string(bytes: &[u8]) -> Result<String, FromUtf8Error> {
-        String::from_utf8(bytes.to_vec())
-    }
 
     #[tokio::test]
     async fn basic() {
@@ -124,7 +119,7 @@ mod tests {
             stream::once(async move {
                 Ok(body)
             }),
-            as_string
+            |bytes: &[u8]| String::from_utf8(bytes.to_vec())
         );
 
         let chunks = stream.try_collect::<Vec<_>>().await.unwrap();
@@ -147,7 +142,7 @@ mod tests {
         let regular_data_chunks = {
             let mut stream = pin!(DataOnlyStream::new(
                 stream::iter(&regular_chunks).map(Ok),
-                as_string
+                |bytes: &[u8]| String::from_utf8(bytes.to_vec())
             ));
 
             let mut vec = Vec::with_capacity(regular_chunks.len());
@@ -164,7 +159,7 @@ mod tests {
 
         let irregular_data_chunks = DataOnlyStream::new(
             stream::iter(irregular_chunks).map(Ok),
-            as_string
+            |bytes: &[u8]| String::from_utf8(bytes.to_vec())
         ).try_collect::<Vec<_>>().await.unwrap();
 
         assert_eq!(regular_data_chunks, irregular_data_chunks);

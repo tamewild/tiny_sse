@@ -1,5 +1,7 @@
 mod data_only;
 
+pub use data_only::*;
+
 use crate::parser::{Field, FieldKind, ParseResult, ParsedLine};
 use crate::Error;
 use crate::{parser, Event};

@@ -3,6 +3,7 @@ use futures::{StreamExt, TryStreamExt};
 use std::convert::Infallible;
 use std::sync::LazyLock;
 use tokio::runtime::Builder;
+use tiny_sse::DataOnlyStream;
 
 macro_rules! iterate_on_stream {
     ($chunks:ident, $ty:ty) => {
@@ -38,20 +39,50 @@ fn sse(c: &mut Criterion) {
 
     let mut regular = c.benchmark_group("regular");
 
-    regular.bench_function("tiny_sse", |b| {
-        b.to_async(&rt).iter(|| iterate_on_stream!(REGULAR_CHUNKS, tiny_sse::EventStream<_>))
+    regular.bench_function("tiny_sse (full)", |b| {
+        b.to_async(&rt).iter(|| iterate_on_stream!(REGULAR_CHUNKS, tiny_sse::EventStream<_>));
+    });
+
+    regular.bench_function("tiny_sse (data only)", |b| {
+        b.to_async(&rt).iter(|| async {
+             DataOnlyStream::new(
+                 futures::stream::iter(&*REGULAR_CHUNKS).map(Ok),
+                 |bytes: &[u8]| String::from_utf8(bytes.to_vec())
+             )
+                 .try_for_each(|data| async move {
+                     criterion::black_box(data);
+                     Ok(())
+                 })
+                 .await
+                 .unwrap();
+        });
     });
 
     regular.bench_function("eventsource-stream", |b| {
-        b.to_async(&rt).iter(|| iterate_on_stream!(REGULAR_CHUNKS, eventsource_stream::EventStream<_>))
+        b.to_async(&rt).iter(|| iterate_on_stream!(REGULAR_CHUNKS, eventsource_stream::EventStream<_>));
     });
 
     regular.finish();
 
     let mut irregular = c.benchmark_group("irregular");
 
-    irregular.bench_function("tiny_sse", |b| {
+    irregular.bench_function("tiny_sse (full)", |b| {
         b.to_async(&rt).iter(|| iterate_on_stream!(IRREGULAR_CHUNKS, tiny_sse::EventStream<_>));
+    });
+
+    irregular.bench_function("tiny_sse (data only)", |b| {
+        b.to_async(&rt).iter(|| async {
+            DataOnlyStream::new(
+                futures::stream::iter(&*IRREGULAR_CHUNKS).map(Ok),
+                |bytes: &[u8]| String::from_utf8(bytes.to_vec())
+            )
+                .try_for_each(|data| async move {
+                    criterion::black_box(data);
+                    Ok(())
+                })
+                .await
+                .unwrap();
+        });
     });
 
     irregular.bench_function("eventsource-stream", |b| {
