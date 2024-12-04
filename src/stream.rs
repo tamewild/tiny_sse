@@ -427,7 +427,7 @@ data:  third event"#;
             b"\xBFdata:Test\n\n"
         ];
 
-        let stream = EventStream::new(stream::iter(chunks.map(Ok::<_, Infallible>)));
+        let stream = EventStream::new(stream::iter(chunks).map(Ok::<_, Infallible>));
 
         let events = stream.try_collect::<Vec<_>>().await.unwrap();
 
@@ -474,7 +474,7 @@ data:  third event"#;
         ]).await;
     }
 
-    async fn chunks(path: impl AsRef<Path>) -> Vec<String> {
+    pub async fn chunks(path: impl AsRef<Path>) -> Vec<String> {
         let raw = tokio::fs::read_to_string(path).await.unwrap();
 
         serde_json::from_str::<Vec<String>>(raw.as_str()).unwrap()
@@ -496,7 +496,6 @@ data:  third event"#;
             events.push(event);
         }
 
-        assert_eq!(chunks_len, events.len());
         assert!(stream.buffer.is_empty());
         assert_eq!(stream.buffer.capacity(), 0);
     }
@@ -507,7 +506,7 @@ data:  third event"#;
         let irregular_chunks = chunks("misc/irregular_chunks.json").await;
 
         let regular_events = EventStream::new(
-            stream::iter(regular_chunks.as_slice()).map(Ok::<_, Infallible>)
+            stream::iter(&regular_chunks).map(Ok::<_, Infallible>)
         ).try_collect::<Vec<_>>().await.unwrap();
         let irregular_events = EventStream::new(
             stream::iter(irregular_chunks).map(Ok::<_, Infallible>)

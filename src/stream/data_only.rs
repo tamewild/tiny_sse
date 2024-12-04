@@ -5,7 +5,11 @@ use pin_project_lite::pin_project;
 use crate::parser;
 use crate::parser::{Field, FieldKind, ParseResult, ParsedLine};
 
+// NOTE: This doesn't support multiple data lines in a single event.
+// The last data line of the event will be used. The rest will be discarded.
 fn parse_lines_for_data(mut buffer: &[u8]) -> (Option<&[u8]>, &[u8]) {
+    let mut data = None;
+
     loop {
         let res = parser::parse_line(buffer);
 
@@ -13,8 +17,16 @@ fn parse_lines_for_data(mut buffer: &[u8]) -> (Option<&[u8]>, &[u8]) {
             ParseResult::Parsed { line, rem } => {
                 buffer = rem;
 
-                if let ParsedLine::Field(Field { kind: FieldKind::Data, value }) = line {
-                    break (Some(value), buffer)
+                match line {
+                    ParsedLine::Field(Field { kind: FieldKind::Data, value }) => {
+                        data = Some(value);
+                    }
+                    ParsedLine::Dispatch => {
+                        if let Some(data) = data {
+                            break (Some(data), buffer)
+                        }
+                    }
+                    _ => {}
                 }
             }
             ParseResult::Incomplete => break (None, buffer)
@@ -93,8 +105,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use futures::{stream, TryStreamExt};
+    use std::convert::Infallible;
+    use std::pin::pin;
+    use std::string::FromUtf8Error;
+    use futures::{stream, StreamExt, TryStreamExt};
+    use crate::EventStream;
     use crate::stream::data_only::DataOnlyStream;
+
+    fn as_string(bytes: &[u8]) -> Result<String, FromUtf8Error> {
+        String::from_utf8(bytes.to_vec())
+    }
 
     #[tokio::test]
     async fn basic() {
@@ -104,14 +124,61 @@ mod tests {
             stream::once(async move {
                 Ok(body)
             }),
-            |bytes: &[u8]| String::from_utf8(bytes.to_vec())
+            as_string
         );
 
         let chunks = stream.try_collect::<Vec<_>>().await.unwrap();
 
-        assert_eq!(chunks, vec![
+        assert_eq!(chunks, [
             "test",
             "second event"
         ]);
+    }
+
+    #[tokio::test]
+    async fn parity() {
+        let regular_chunks = crate::stream::tests::chunks(
+            "misc/regular_chunks.json"
+        ).await;
+        let irregular_chunks = crate::stream::tests::chunks(
+            "misc/irregular_chunks.json"
+        ).await;
+
+        let regular_data_chunks = {
+            let mut stream = pin!(DataOnlyStream::new(
+                stream::iter(&regular_chunks).map(Ok),
+                as_string
+            ));
+
+            let mut vec = Vec::with_capacity(regular_chunks.len());
+
+            while let Some(Ok(data)) = stream.next().await {
+                vec.push(data);
+            }
+
+            assert_eq!(stream.buffer.capacity(), 0);
+            assert_eq!(regular_chunks.len(), vec.len());
+
+            vec
+        };
+
+        let irregular_data_chunks = DataOnlyStream::new(
+            stream::iter(irregular_chunks).map(Ok),
+            as_string
+        ).try_collect::<Vec<_>>().await.unwrap();
+
+        assert_eq!(regular_data_chunks, irregular_data_chunks);
+
+        let regular_events = EventStream::new(
+            stream::iter(&regular_chunks).map(Ok::<_, Infallible>)
+        )
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|ev| ev.data)
+            .collect::<Vec<_>>();
+
+        assert_eq!(regular_data_chunks, regular_events);
     }
 }
