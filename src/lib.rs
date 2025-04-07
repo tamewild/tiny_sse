@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Display, Formatter};
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
 
@@ -28,6 +29,16 @@ pub enum Error<E> {
     StrUtf8(Utf8Error),
     /// Error originating from the source stream
     Source(E)
+}
+
+impl<E: Debug + Display> Display for Error<E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:#?}")
+    }
+}
+
+impl<E: Debug + Display> std::error::Error for Error<E> {
+
 }
 
 pub fn add(left: u64, right: u64) -> u64 {
