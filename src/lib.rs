@@ -9,15 +9,15 @@ pub use stream::*;
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Event {
     /// The event's type if provided. Otherwise, empty.
-    ty: String,
+    pub ty: String,
     /// The event's data if provided. Otherwise, empty.
-    data: String,
+    pub data: String,
     /// The event's ID if provided. Otherwise, empty.
-    id: String,
+    pub id: String,
     /// A reconnection time, in milliseconds. This must initially be an implementation-defined value, probably in the region of a few seconds.
     ///
     /// Source: https://html.spec.whatwg.org/multipage/server-sent-events.html#concept-event-stream-reconnection-time
-    retry: Option<u64>
+    pub retry: Option<u64>
 }
 
 #[derive(Debug, PartialEq)]
