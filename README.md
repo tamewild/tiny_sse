@@ -1,0 +1,1 @@
+This project is used in my internal benchmark harness written in Rust. It was intended to be performant and minimize heap allocations. It's worked well for almost 2 years at this point, but I'm aware it's not perfect. Might be useful for some people
